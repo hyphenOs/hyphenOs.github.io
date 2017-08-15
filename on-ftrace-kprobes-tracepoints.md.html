@@ -1,0 +1,142 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,700,400italic' rel='stylesheet' type='text/css'>
+
+    <link rel="stylesheet" type="text/css" href="/theme/stylesheet/style.min.css">
+
+  <link rel="stylesheet" type="text/css" href="/theme/pygments/monokai.min.css">
+  <link rel="stylesheet" type="text/css" href="/theme/font-awesome/css/font-awesome.min.css">
+
+
+
+
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="HandheldFriendly" content="True" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="" />
+
+
+<meta name="author" content="Abhijit Gadgil" />
+<meta name="description" content="For a beginner, tracing infrastructure in Linux can be considerably confusing. It's easier to get lost while trying to figure out what exactly are tracing mechanisms, which ones should be used. Addition of new eBPF support for tracing has added more to it. This is just an attempt to compile what is my current understanding, with a slightly more bias towards what facilities eBPF provides, as this is the state of the art." />
+<meta name="keywords" content="linux-kernel, tracing, bpf, ftrace">
+<meta property="og:site_name" content="hyphenOs {-Os} Blog"/>
+<meta property="og:title" content="On Ftrace, kprobes, tracepoints"/>
+<meta property="og:description" content="For a beginner, tracing infrastructure in Linux can be considerably confusing. It's easier to get lost while trying to figure out what exactly are tracing mechanisms, which ones should be used. Addition of new eBPF support for tracing has added more to it. This is just an attempt to compile what is my current understanding, with a slightly more bias towards what facilities eBPF provides, as this is the state of the art."/>
+<meta property="og:locale" content="en_US"/>
+<meta property="og:url" content="/on-ftrace-kprobes-tracepoints.md.html"/>
+<meta property="og:type" content="article"/>
+<meta property="article:published_time" content="2017-08-02 00:00:00+05:30"/>
+<meta property="article:modified_time" content=""/>
+<meta property="article:author" content="/author/abhijit-gadgil.html">
+<meta property="article:section" content="Performance"/>
+<meta property="article:tag" content="linux-kernel"/>
+<meta property="article:tag" content="tracing"/>
+<meta property="article:tag" content="bpf"/>
+<meta property="article:tag" content="ftrace"/>
+<meta property="og:image" content="/images/hyphenos-white.svg">
+
+  <title>hyphenOs {-Os} Blog &ndash; On Ftrace, kprobes, tracepoints</title>
+
+</head>
+<body>
+  <aside>
+    <div>
+      <a href="">
+        <img src="/images/hyphenos-white.svg" alt="" title="">
+      </a>
+      <h1><a href=""></a></h1>
+
+
+      <nav>
+        <ul class="list">
+
+          <li><a href="https://hyphenos.io/" target="_blank">hyphenOs Home</a></li>
+        </ul>
+      </nav>
+
+      <ul class="social">
+        <li><a class="sc-github" href="https://github.com/hyphenOs" target="_blank"><i class="fa fa-github"></i></a></li>
+      </ul>
+    </div>
+
+
+  </aside>
+  <main>
+
+
+<article class="single">
+  <header>
+    <h1 id="on-ftrace-kprobes-tracepoints.md">On Ftrace, kprobes, tracepoints</h1>
+    <p>
+          Posted on Wed 02 August 2017 in <a href="/category/performance.html">Performance</a>
+
+
+    </p>
+  </header>
+
+
+  <div>
+    <p>Note: This is going to start more as a brain-dump and over a period of time, I am going to iterate over this, till it comes in some consumable form.</p>
+<p>Most of the Linux dynamic tracing is built around the core support in kernel called <code>Ftrace</code>, this started as a function trace sub-system, but is considerably more involved now. All the major tools like <a href="">LTTng</a>, <a href="">SystemTap</a> or the more recent <a href="">BCC</a> make use of this infrastructure and then build upon it. In fact some of the kernel developments like <code>kprobes</code> and <code>uprobes</code> were developed in SystemTap project.</p>
+<p>Found a <a href="http://events.linuxfoundation.org/images/stories/pdf/lceu2012_zannoni.pdf">good presentation</a>, that provides a historical perspective of how many of these projects are started. I have also created a <a href="https://www.slideshare.net/gabhijit1/clipboards/linux-tracing">clipboard</a>, that give a timeline of Linux tracing and evolution of BPF support. Ths helped me understand why some of the utilities in <code>bcc</code> won't run on my Ubuntu 16.04 system.</p>
+<p>Arguably one of the best (if not the best) resource about Linux tracing is <a href="http://www.brendangregg.com/">Brendan Gregg's Blog</a>.</p>
+<p>Coming back to specifics - it is possible to 'trace' following -</p>
+<ol>
+<li>
+<p>A vast majority of kernel functions - those availabble inside <code>/sys/kernel/debug/tracing/available_filter_functions</code>. (This assumes you have mounted the <code>tracefs</code> in more recent kernels (and <code>debugfs</code> in slightly older kernels) on the <code>/sys/kernel/debug/tracing</code> path. It's possible to trace only a subset of those functions or functions belonging to a particular subsystem like say <code>net</code> etc. Kernel's documentation is a good starting point inside `Documentation/trace/ftrace.txt' and a few other files.</p>
+</li>
+<li>
+<p><code>kprobes</code> provided a mechanism to trace both <code>entry</code> and <code>exit</code> of a function. However the mechanism to do this was slightly involved, in the absence of integration with <code>ftrace</code> mechanism (basically a similar mechanism to trace functions above). However with <code>ftrace</code> support for <code>kprobes</code>, this has become very useful.</p>
+</li>
+<li>
+<p>In addition there are a number of <code>tracepoints</code> defined in various subsystems. But it's not quite clear to me - which are the use cases where it would make sense to use this mechanims as opposed to one of the above, which seem to be very flexible.</p>
+</li>
+<li>
+<p><code>perf</code> events (not fully understood yet).</p>
+</li>
+<li>
+<p>Userspace probing (not fully understood it yet).</p>
+</li>
+</ol>
+<p>The recent eBPF has made tracing a lot more interesting. What eBPF essentially allows is adding a code from Userspace to the kernel at the runtime, that can be interfaced with the above <code>ftrace</code> mechanism. <code>bcc</code> pointed above, has developed a lot of useful tools using this mechanism.</p>
+  </div>
+  <div class="tag-cloud">
+    <p>
+      <a href="/tag/linux-kernel.html">linux-kernel</a>
+      <a href="/tag/tracing.html">tracing</a>
+      <a href="/tag/bpf.html">bpf</a>
+      <a href="/tag/ftrace.html">ftrace</a>
+    </p>
+  </div>
+
+
+
+
+</article>
+
+    <footer>
+<p>&copy; hyphenOs Software Labs. Pvt. Ltd. </p>
+<p>    Powered by <a href="http://getpelican.com" target="_blank">Pelican</a> - <a href="https://github.com/alexandrevicenzi/flex" target="_blank">Flex</a> theme by <a href="http://alexandrevicenzi.com" target="_blank">Alexandre Vicenzi</a>
+</p>    </footer>
+  </main>
+
+
+
+
+
+<script type="application/ld+json">
+{
+  "@context" : "http://schema.org",
+  "@type" : "Blog",
+  "name": " hyphenOs {-Os} Blog ",
+  "url" : "",
+  "image": "/images/hyphenos-white.svg",
+  "description": ""
+}
+</script>
+</body>
+</html>

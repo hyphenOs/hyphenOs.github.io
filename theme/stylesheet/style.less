@@ -73,6 +73,7 @@ img {
 
 aside {
   background-color: @sidebar-bg;
+  background: linear-gradient(90deg, @hos-blue, @hos-green 70%, @hos-green);
   color: @sidebar-text-color;
   text-align: center;
 
@@ -109,7 +110,6 @@ aside {
         display: inline;
         line-height: 1.6em;
         font-size: 1.28em;
-        text-transform: lowercase;
       }
     }
   }
@@ -122,31 +122,19 @@ main {
     font-size: .72em;
     padding: 14px 0 14px 0;
     border-bottom: @nav-border-color 1px solid;
-  }
 
-  nav, .translations {
     a {
       padding: 0 4px 0 4px;
-      border-left: @nav-border-color 1px solid;
       border-right: @nav-border-color 1px solid;
     }
 
     :first-child {
-      border-left: none;
+      border-left: @nav-border-color 1px solid;
     }
-
-    :last-child {
-      border-right: none;
-    }
-  }
-
-  .neighbors {
-    margin: 4% 0% 4% 0%;
-    height: 20px;
   }
 
   .pagination {
-    margin: 4% 8% 4% 8%;
+    margin: 4% 8% 2% 8%;
     height: 20px;
   }
 
@@ -157,7 +145,11 @@ main {
   }
 
   article {
-    margin: 0 8% 2% 8%;
+    margin: 0 5% 2% 5%;
+
+    p {
+	text-align: justify;
+    }
 
     header {
       h1, h2 {
@@ -167,14 +159,7 @@ main {
       p {
         color: @header-text-color;
         font-size: 0.86em;
-      }
-
-      .translations {
-        float: right;
-
-        .active {
-          font-weight: 600;
-        }
+	text-align: justify;
       }
     }
 
@@ -224,7 +209,7 @@ main {
     code {
       font-size: .8em;
       white-space: nowrap;
-      color: #c25;
+      color: @code-blue;
       padding: 1px 3px;
       background-color: #f7f7f9;
       border: 1px solid #e1e1e8;
@@ -310,16 +295,6 @@ a.btn:hover {
   display: block;
 }
 
-.align-center {
-  margin-left: auto;
-  margin-right: auto;
-  display: block;
-}
-
-.float-left {
-  float: left;
-}
-
 .float-right {
   float: right;
 }
@@ -390,10 +365,6 @@ ul.social {
     background-color: @google-bg-color;
   }
 
-  a.sc-instagram {
-    background-color: @instagram-bg-color;
-  }
-
   a.sc-pinterest {
     background-color: @pinterest-bg-color;
   }
@@ -408,10 +379,6 @@ ul.social {
 
   a.sc-stack-overflow {
     background-color: @stack-overflow-bg-color;
-  }
-
-  a.sc-tumblr {
-    background-color: @tumblr-bg-color;
   }
 
   a.sc-twitter {
@@ -437,15 +404,6 @@ ul.social {
   a.sc-soundcloud {
     background-color: @soundcloud-bg-color;
   }
-
-  a.sc-gitlab {
-    background-color: @gitlab-bg-color;
-  }
-
-  a.sc-xing {
-    background-color: @xing-bg-color;
-  }
-
 }
 
 .ads-aside {
@@ -468,7 +426,7 @@ ul.social {
 
 @media screen and (min-width: 768px) {
   aside {
-    width: 25%;
+    width: 20%;
     height: 100%;
     position: fixed;
     top: 0;
