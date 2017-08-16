@@ -91,8 +91,8 @@
 <p>What we are essentially going to do is Output repository and Theme repository are going to be <code>git submodules</code> of our Content repository. So the work-flow becomes.</p>
 <ul>
 <li>Init Content Repository (see below for more details).</li>
-<li>Add Output repository as <code>git submodule</code>. <code>git submodule add https://path-to-your.git output</code></li>
-<li>Add Theme repository as <code>git submodule</code>. <code>git submodule add https://github.com/getpelican/pelican-themes theme</code></li>
+<li>Add Output repository as <code>git submodule</code> (<code>git submodule add https://path-to-your.git output</code>)</li>
+<li>Add Theme repository as <code>git submodule</code> (<code>git submodule add https://github.com/getpelican/pelican-themes themes</code>)</li>
 <li>Add Content to your repository Using Markdown or RST or any Pelican supported Syntax.</li>
 <li>Run <code>make</code>. (Wow!)</li>
 </ul>
@@ -105,9 +105,13 @@
 <li>Run <code>venv/bin/pelican-generator</code> utility to set blog wide defaults (be sure to create a <code>Makefile</code>, it's very convenient.).</li>
 <li>Next we should edit the <code>Makefile</code> to point to correct Python and Pelican executables. Change <code>PY?=python</code> to <code>PY?=venv/bin/python</code> and similarly for <code>PELICAN?=pelican</code> to <code>PELICAN?=venv/bin/pelican</code> in the Makefile.</li>
 <li>Start writing stuff.</li>
+<li>When done simply do a <code>make html</code> and then finally.</li>
+<li><code>git push</code> the 'output' directory where the blogs are generated.</li>
 </ol>
 <h2>Changing Theme</h2>
 <p>In order to use the non-standard theme, one downloaded from the Themes repository above, one can simply add a variable like <code>THEME = themes/Flex</code> to <code>pelicanconf.py</code> file. To be able to use this - you have to do <code>git submodule update --remote --recursive</code> inside the <code>themes/Flex</code> directory, since that itself is a <code>git submodule</code>. Since I am not interested in all the themes now, I am not doing a <code>git submodule init</code> here. Instead I am just taking whatever I am interested in.</p>
+<h2>Conclusion</h2>
+<p>This is a very easy way of maintaining your blog in a git repo.</p>
   </div>
   <div class="tag-cloud">
     <p>

@@ -29,7 +29,7 @@
 <meta property="og:locale" content="en_US"/>
 <meta property="og:url" content="/opencontrail-getting-started-lessons-1.html"/>
 <meta property="og:type" content="article"/>
-<meta property="article:published_time" content="2017-08-02 00:00:00+05:30"/>
+<meta property="article:published_time" content="2017-08-04 00:00:00+05:30"/>
 <meta property="article:modified_time" content=""/>
 <meta property="article:author" content="/author/abhijit-gadgil.html">
 <meta property="article:section" content="Networking"/>
@@ -72,7 +72,7 @@
   <header>
     <h1 id="opencontrail-getting-started-lessons-1">Getting started with OpenContrail, Lessons Learned (Part 1)</h1>
     <p>
-          Posted on Wed 02 August 2017 in <a href="/category/networking.html">Networking</a>
+          Posted on Fri 04 August 2017 in <a href="/category/networking.html">Networking</a>
 
 
     </p>
@@ -103,9 +103,9 @@ make install
 <li>Keep trying till we are successful.</li>
 </ol>
 <p>This looked like a viable approach and I started making some progress. Something worth mentioning here, I wanted to start with building something bare minimum and then build more once I get comfortable with what is getting built and I am able to try at-least some of the things that get built. There's a bit of quirk worth mentioning here, OpenContrail uses a lot of old versions of third party software that is not distributed as a package (either by OpenContrail or officially by Ubuntu/Redhat etc.) Some of the software versions are so old - nearly three years and patches for those versions. It was perhaps easier to have got those changes merged into upstream, so that this quirk could be avoided, unfortunately that doesn't look like the case as of now. One has to leave with 'source downloading' and sometimes 'patching' these third party modules. The patches required for patching some of these <code>third-party</code> modules are available from a repository <a href="">third-party</a>. Instead of downloading everything in one go, I decided to do one at a time - something like</p>
-<div class="highlight"><pre><span></span>while ! success:
+<div class="highlight"><pre><span></span><span class="k">while</span> ! success:
     scons
-    if failed:
+    <span class="k">if</span> failed:
         look at the failure and update a third-party software and/or install new software.
 </pre></div>
 
