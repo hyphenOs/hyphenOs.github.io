@@ -21,11 +21,11 @@
 
 
 <meta name="author" content="Abhijit Gadgil" />
-<meta name="description" content="Recently, for one of the projects we are working on, I was looking at processing data from Pandas panel. I wanted to find out certain items in a Panel based on certain criteria on the minor axis. I worked with two flavors and the findings for different data-sets are quite interesting. Something that would definitely qualify as an interesting learning. We discuss, how profiling can be successfully used to explain certain Performance behvior, that often looks counter-intuitive." />
+<meta name="description" content="Recently, for one of the projects we are working on, I was looking at processing data from Pandas panel. I wanted to find out certain items in a Panel based on certain criteria on the minor axis. I worked with two flavors and the findings for different data-sets are quite interesting. Something that would definitely qualify as an interesting learning. We discuss, how profiling can be successfully used to explain certain Performance behavior, that often looks counter-intuitive." />
 <meta name="keywords" content="pandas, numpy">
 <meta property="og:site_name" content="hyphenOs {-Os} Blog"/>
 <meta property="og:title" content="So Vector Operations Are Fast, Right?"/>
-<meta property="og:description" content="Recently, for one of the projects we are working on, I was looking at processing data from Pandas panel. I wanted to find out certain items in a Panel based on certain criteria on the minor axis. I worked with two flavors and the findings for different data-sets are quite interesting. Something that would definitely qualify as an interesting learning. We discuss, how profiling can be successfully used to explain certain Performance behvior, that often looks counter-intuitive."/>
+<meta property="og:description" content="Recently, for one of the projects we are working on, I was looking at processing data from Pandas panel. I wanted to find out certain items in a Panel based on certain criteria on the minor axis. I worked with two flavors and the findings for different data-sets are quite interesting. Something that would definitely qualify as an interesting learning. We discuss, how profiling can be successfully used to explain certain Performance behavior, that often looks counter-intuitive."/>
 <meta property="og:locale" content="en_US"/>
 <meta property="og:url" content="/vector-operations-are-fast-right.html"/>
 <meta property="og:type" content="article"/>
@@ -89,8 +89,8 @@ The experiments will typically be of the following two kinds -</p>
 </ol>
 <p>The eventual goal is to develop a 'service' that can be offered to users.</p>
 <h3>So coming to concrete problem</h3>
-<p>We are mainly going to be cocerned about the <em>How</em> question here. We are going to make use of <a href="http://pandas.pydata.org/">pandas</a> features to achieve the stuff we are trying to arrive. So at a high level, the idea is - A pandas <code>Panel</code> that has got a list of 'stocks' as <code>items</code> and we have each <code>item</code> which has historical data as a <code>DataFrame</code> with date as <code>index</code> and 'OHLC' as columns. Since our focus is not on so much on <em>What</em> questions to ask, we will take a simple criterion which is stock having a positive close ie. last close is higher than previous close. ie. to put simplistically - <code>DataFrame.iloc[-1] &gt; DataFraome.iloc[-2]</code>.</p>
-<p>The first solution that I came up with based on List Comprehensins -</p>
+<p>We are mainly going to be concerned about the <em>How</em> question here. We are going to make use of <a href="http://pandas.pydata.org/">pandas</a> features to achieve the stuff we are trying to arrive. So at a high level, the idea is - A pandas <code>Panel</code> that has got a list of 'stocks' as <code>items</code> and we have each <code>item</code> which has historical data as a <code>DataFrame</code> with date as <code>index</code> and 'OHLC' as columns. Since our focus is not on so much on <em>What</em> questions to ask, we will take a simple criterion which is stock having a positive close ie. last close is higher than previous close. ie. to put simplistically - <code>DataFrame.iloc[-1] &gt; DataFraome.iloc[-2]</code>.</p>
+<p>The first solution that I came up with based on List Comprehension -</p>
 <div class="highlight"><pre><span></span><span class="n">pan</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Panel</span><span class="p">(</span><span class="n">scripdata_dict</span><span class="p">)</span>
 
 <span class="c1"># All Items where the following condition is true and</span>
@@ -267,8 +267,8 @@ The experiments will typically be of the following two kinds -</p>
 </pre></div>
 
 
-<p>Eureka! The <code>transpose</code> function has become extremely expensive for this big data. Note, the number of funtion calls is still about the same, about 7000 vs. 500000, but at-least some of the functions have become exensive and interestingly the total cost was actually growing sub-linearly for the List Comprehension method.</p>
-<p>Now, when one looks at this data, it's clearly not that counter intuitive. We are doing a <code>memcpy</code> of a huge array in the <code>transpose</code> method and that's likely is a cause of real slowdown. While in the former case, there was still <code>memcpy</code>, but on a data that could probably fit easily in cache (or at-least was quite cache friendly) compared to this. A lesson from 'Networking Datapath 101' don't do <code>memcpy</code> in the fast path.</p>
+<p>Eureka! The <code>transpose</code> function has become extremely expensive for this big data. Note, the number of function calls is still about the same, about 7000 vs. 500000, but at-least some of the functions have become expensive and interestingly the total cost was actually growing sub-linearly for the List Comprehension method.</p>
+<p>Now, when one looks at this data, it's clearly not that counter intuitive. We are doing a <code>memcpy</code> of a huge array in the <code>transpose</code> method and that's likely is a cause of real slowdown. While in the former case, there was still <code>memcpy</code>, but on a data that could probably fit easily in cache (or at-least was quite cache friendly) compared to this. A lesson from 'networking data-path 101' don't do <code>memcpy</code> in the fast path.</p>
 <p>We need to still follow this line of thought and find out more about what's happening under the hood. Some of the things that are worth experimenting include -</p>
 <ol>
 <li>double the data size and compute the fraction of time spent in <code>transpose</code> for every doubling and expect to see a knee somewhere.</li>
@@ -276,7 +276,7 @@ The experiments will typically be of the following two kinds -</p>
 <li>Indeed look at the <code>perf</code> counters and see cache statistics.</li>
 </ol>
 <p>Will write a follow up on this to actually find out what the findings above are.</p>
-<p>Few lessons learnt here -</p>
+<p>Few lessons learned here -</p>
 <ul>
 <li>Just don't go by what theoretically makes sense. Know precisely what you are trying to do and what scale.</li>
 <li>RTFM - because clearly <a href="http://pandas.pydata.org/pandas-docs/version/0.20.3/generated/pandas.Panel.transpose.html">documentation on transpose</a> says, for Mixed-dtype data, will always result in a copy.</li>
@@ -285,7 +285,7 @@ The experiments will typically be of the following two kinds -</p>
 <p>And a few collateral benefits -</p>
 <ol>
 <li>Had an actual use-case for studying <code>cProfile</code> rather than trying some simple 'hello world!' stuff.</li>
-<li>Learnt about a beautiful tool <a href="https://github.com/jrfonseca/gprof2dot">gprof2dot</a>, when trying to find out more about the actual call-graphs and find out the culprits. It's worth checking out.</li>
+<li>Learned about a beautiful tool <a href="https://github.com/jrfonseca/gprof2dot">gprof2dot</a>, when trying to find out more about the actual call-graphs and find out the culprits. It's worth checking out.</li>
 </ol>
   </div>
   <div class="tag-cloud">

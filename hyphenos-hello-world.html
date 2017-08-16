@@ -21,11 +21,11 @@
 
 
 <meta name="author" content="Abhijit Gadgil" />
-<meta name="description" content="Started hyphenOs blog on github pages, that is powered by Pelican. This articlue describes the setup." />
+<meta name="description" content="Started hyphenOs blog on github pages, that is powered by Pelican. This article describes the setup." />
 <meta name="keywords" content="pelican">
 <meta property="og:site_name" content="hyphenOs {-Os} Blog"/>
 <meta property="og:title" content="Hello Static Site Generator"/>
-<meta property="og:description" content="Started hyphenOs blog on github pages, that is powered by Pelican. This articlue describes the setup."/>
+<meta property="og:description" content="Started hyphenOs blog on github pages, that is powered by Pelican. This article describes the setup."/>
 <meta property="og:locale" content="en_US"/>
 <meta property="og:url" content="/hyphenos-hello-world.html"/>
 <meta property="og:type" content="article"/>
@@ -81,7 +81,7 @@
 <p>Traditionally, if one wanted to host a blog, one would typically be doing something like <a href="https://wordpress.com/">Wordpress</a> or <a href="https://wordpress.com/">Blogger</a>. However writing blogs there is extremely inconvenient to say the list. Plus you want to version control your blog and so on. The solution to these problems is typically - the Static File Generators like <a href="http://jekyllrb.com/">Jekyll</a> or <a href="https://blog.getpelican.com/">Pelican</a>. Well, there are a <a href="https://www.staticgen.com/">number of those</a> if one thinks that the above choices are rather limited :-).</p>
 <p>Advantage of <code>Jekyll</code> is, it is natively supported by Github Pages thus making it easier to use that if you want to quickly get started with your own GitHub page <code>foo.github.io</code>. The interested people can read the <a href="https://guides.github.com/features/pages/">documentation</a> and get started.</p>
 <p>For <code>hyphenOs</code> blog, I wanted to use pelican FWIW. A small issue with this is - since it's not natively supported by Github Pages, it's a bit of an issue to keep track of your posts and also making sure your generated output is pushed to a respective <foo>.github.io repository. So how does one go about it? We make interesting use of <code>git submodule</code> to achieve this. Note: what is described can as well work with gh-pages repo (or I hope so.).</p>
-<p>This approach is explained in a couple of <a href="http://railslide.io/pelican-github-pages.html">blog</a> <a href="http://martinbrochhaus.com/pelican2.html">posts</a> and I am pretty sure there are many more who go into a lot of details. What I am going to describe here is simply how to use <code>output</code> and <code>theme</code> directory as <code>git submodule</code>, so that everythng is version controlled.</p>
+<p>This approach is explained in a couple of <a href="http://railslide.io/pelican-github-pages.html">blog</a> <a href="http://martinbrochhaus.com/pelican2.html">posts</a> and I am pretty sure there are many more who go into a lot of details. What I am going to describe here is simply how to use <code>output</code> and <code>theme</code> directory as <code>git submodule</code>, so that everything is version controlled.</p>
 <p>We basically need three repositories here -</p>
 <ol>
 <li>Content repository - Typically you could create a directory with name blog here. For instance I use directory <a href="https://github.com/hyphenOs/hyphenos-blog">hyphenos-blog</a> to keep all the content.</li>
@@ -90,7 +90,7 @@
 </ol>
 <p>What we are essentially going to do is Output repository and Theme repository are going to be <code>git submodules</code> of our Content repository. So the work-flow becomes.</p>
 <ul>
-<li>Init Content Repository (see below for more details).</li>
+<li>Initialize Content Repository (see below for more details).</li>
 <li>Add Output repository as <code>git submodule</code> (<code>git submodule add https://path-to-your.git output</code>)</li>
 <li>Add Theme repository as <code>git submodule</code> (<code>git submodule add https://github.com/getpelican/pelican-themes themes</code>)</li>
 <li>Add Content to your repository Using Markdown or RST or any Pelican supported Syntax.</li>
