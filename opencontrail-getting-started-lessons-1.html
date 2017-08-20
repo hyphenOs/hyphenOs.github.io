@@ -83,17 +83,18 @@
     <h3>A bit of a background</h3>
 <p>A while back while working on Quali Systems <a href="https://github.com/QualiSystems/OpenStack-Shell">OpenStack Plugin</a>, one of the problems we were not trivially able to solve (in fact not able to solve at all using Neutron APIs) was that it was not possible to provide an L2 connectivity to VMs with possibly other Physical networks. Not sure even that exists today. When I looked at OpenContrail back then, it looked like providing all the right abstractions for connectivity, that is both L2/L3 and also recently the Container Network Interface support was added (which I don't know much about as of now!). Exploring what exact features OpenContrail offered was something I wanted to try out.</p>
 <p>My initial thinking was, OpenContrail being an Open Source project, this should be fairly straight forward, like many other Open Source projects. Something like -</p>
-<pre><code class="bash">git clone
+<div class="highlight"><pre><span></span>git clone
 cmake / configure
 make
 make install
-</code></pre>
+</pre></div>
+
 
 <p>Agreed, I am trivializing this quite a lot especially considering the kind of complexity involved in OpenContrail architecture. Minimum I wanted to check was simply the Compute Node component viz. the vRouter, and see how did the data-path looked like. Unfortunately it didn't turn out to be so simple.</p>
 <p>On the home page of <a href="http://www.opencontrail.org">OpenContrail</a>, you see two tabs, <a href="http://www.opencontrail.org/deploying-opencontrail">Deploy</a> and <a href="http://www.opencontrail.org/opencontrail-quick-start-guide">Quick Start Guide</a>. It's indeed like - <code>I am Feeling Lucky</code>. You try to go to 'Deploy' page and a couple of repositories are mentioned. Looks like - go <code>git clone</code> and do the needful from here. Trouble is when you go to <a href="http://github.com/Juniper/contrail-controller">contrail-controller</a> or <a href="http://github.com/Juniper/contrail-vrouter">contrail-vrouter</a> repository, there is no such thing as a <code>Makefile</code> or <code>CMakeList.txt</code> or <code>configure</code>. Instead you find an odd looking file called <code>SConscript</code>. OpenContrail uses a build system called <a href="http://www.scons.org">scons</a> and this SconScript is like a recipe for building using <code>scons</code>. SconScript is somewhere between <code>CMakeLists.txt</code> and <code>Makefile</code>. Unfortunately - no README.md file that gives you a good overview of how to get started in either of the repositories. May be I should have indeed started with the 'Quick Start Guide' document. Ok, let's try that - it starts with a nice 'Overview', explains the 'Architecture' and so on. So now it's time to download and install right? And then you see something like -</p>
-<p><img alt="OpenContrail 1" src="/images/opencontrail-login-reqd.png" title="Login Required" /></p>
+<p><img alt="OpenContrail 1" src="/images/opencontrail-login-reqd.png" title="Login Required"></p>
 <p>Never mind, you still try to 'Register' there. Ideally you'd use something like 'Login with Github' etc. When you click on that - you see -</p>
-<p><img alt="OpenContrail 2" src="/images/opencontrail-login-screen.png" title="Grant App Permission" /></p>
+<p><img alt="OpenContrail 2" src="/images/opencontrail-login-screen.png" title="Grant App Permission"></p>
 <p>This looks a bit odd, that some rather 'random App' is asking for access to your Github account. Now, this starts getting a bit disappointing. While all this while, I didn't notice - that www.opencontrail.org was <strong>not an https</strong> site. In this day and world? Seriously? So clearly I don't want to use my profile information from any of the social sites here.</p>
 <p>Then I decided, may be this is not how I should go about it. Surely, there must be some repository from where it should be possible to build and install. I look around and finally hit upon a repository that looks like the <a href="https://github.com/Juniper/contrail-build">build repository</a>. It at-least has got the <code>SConstruct</code> file required by <code>scons</code> to build. This being a Python code, I started looking into the file to see what it was doing. Finally, I hit upon a <a href="http://juniper.github.io/contrail-vnc/README.html">document</a> that looks like  the document that you should refer if you want to build opencontrail code. Unfortunately it doesn't appear that the document is well maintained, so you cannot just follow the instructions there trivially, but it broadly provides a guidance. As discussed in the document, I created a 'sandbox' and started following the instructions as best as I could. This revealed that - OpenContrail uses a tool <a href="https://android.googlesource.com/tools/repo">repo</a> that deals with multiple git repos and is in-fact the same tool used by Android's build system. Unfortunately, the way scrips and recipes are written is such that, this tries to build <code>everything</code> and unfortunately starts with <code>web-modules</code>. Somewhere it errored out, so I decided to discontinue that path, this will be too much. I really wanted to build ['vrouter'] and that's it.</p>
 <p>Ideal would have been something like <code>devstack</code>. That you checkout a repository and then simply do a <code>./stack.sh</code>. Something like this I was just not able to find - so I decided to create a tool for the same, inspired by <code>devstack</code>, I called it <a href="https://github.com/hyphenOs/devcontrail">devcontrail</a>. Interestingly, there's actually a Juniper's repository called <a href="https://github.com/Juniper/contrail-installer">contrail-installer</a>, that does something pretty similar, sorry exactly like what I wanted to do. In none of the documents that I read, I could find a reference to this repo. At-least something along the lines - ''Clone this repo - and run <code>./contrail.sh</code>, but be warned this is tested on Ubuntu 14.04 (trusty) only!'' would have been nice.</p>
@@ -104,11 +105,12 @@ make install
 <li>Keep trying till we are successful.</li>
 </ol>
 <p>This looked like a viable approach and I started making some progress. Something worth mentioning here, I wanted to start with building something bare minimum and then build more once I get comfortable with what is getting built and I am able to try at-least some of the things that get built. There's a bit of quirk worth mentioning here, OpenContrail uses a lot of old versions of third party software that is not distributed as a package (either by OpenContrail or officially by Ubuntu/Redhat etc.) Some of the software versions are so old - nearly three years and patches for those versions. It was perhaps easier to have got those changes merged into upstream, so that this quirk could be avoided, unfortunately that doesn't look like the case as of now. One has to leave with 'source downloading' and sometimes 'patching' these third party modules. The patches required for patching some of these <code>third-party</code> modules are available from a repository <a href="https://github.com/Juniper/contrail-third-party">third-party</a>. Instead of downloading everything in one go, I decided to do one at a time - something like</p>
-<pre><code class="bash">while ! success:
+<div class="highlight"><pre><span></span><span class="k">while</span> ! success:
     scons
-    if failed:
+    <span class="k">if</span> failed:
         look at the failure and update a third-party software and/or install new software.
-</code></pre>
+</pre></div>
+
 
 <p>This approach seems to work, however there are a few packages that give trouble - which is worth mentioning here -</p>
 <ol>

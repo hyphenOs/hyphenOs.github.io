@@ -91,185 +91,181 @@ The experiments will typically be of the following two kinds -</p>
 <h3>So coming to concrete problem</h3>
 <p>We are mainly going to be concerned about the <em>How</em> question here. We are going to make use of <a href="http://pandas.pydata.org/">pandas</a> features to achieve the stuff we are trying to arrive. So at a high level, the idea is - A pandas <code>Panel</code> that has got a list of 'stocks' as <code>items</code> and we have each <code>item</code> which has historical data as a <code>DataFrame</code> with date as <code>index</code> and 'OHLC' as columns. Since our focus is not on so much on <em>What</em> questions to ask, we will take a simple criterion which is stock having a positive close ie. last close is higher than previous close. ie. to put simplistically - <code>DataFrame.iloc[-1] &gt; DataFraome.iloc[-2]</code>.</p>
 <p>The first solution that I came up with based on List Comprehension -</p>
-<pre><code class="python">pan = pd.Panel(scripdata_dict)
+<div class="highlight"><pre><span></span><span class="n">pan</span> <span class="o">=</span> <span class="n">pd</span><span class="o">.</span><span class="n">Panel</span><span class="p">(</span><span class="n">scripdata_dict</span><span class="p">)</span>
 
-# All Items where the following condition is true and
-# then use the boolean selectors to select items of our choice.
-sels = [pan[x]['close'][-1] &gt; pan[x]['close'][-2] for x in pan]
+<span class="c1"># All Items where the following condition is true and</span>
+<span class="c1"># then use the boolean selectors to select items of our choice.</span>
+<span class="n">sels</span> <span class="o">=</span> <span class="p">[</span><span class="n">pan</span><span class="p">[</span><span class="n">x</span><span class="p">][</span><span class="s1">&#39;close&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">pan</span><span class="p">[</span><span class="n">x</span><span class="p">][</span><span class="s1">&#39;close&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">pan</span><span class="p">]</span>
+</pre></div>
 
-</code></pre>
 
 <p>However, after looking at this, it's clearly not a 'fast' 'vector' operation. So likely there's a faster way of doing this using 'vector' operations, after all that's what <code>numpy</code> and hence <code>pandas</code> is extremely good at. A following approach based on using <code>transpose</code> could be useful. I am not sure whether this is 'the fastest way' or there could be an even better way. But we'd continue exploring the following approach -</p>
-<pre><code class="python"># Create a transpose of the Panel, now `items` become major axis.
-# Select all rows such that the condition is true and then use
-# the major axis (which is also an index) of the dataframe of `close` item.
+<div class="highlight"><pre><span></span><span class="c1"># Create a transpose of the Panel, now `items` become major axis.</span>
+<span class="c1"># Select all rows such that the condition is true and then use</span>
+<span class="c1"># the major axis (which is also an index) of the dataframe of `close` item.</span>
 
-pan2 = pan.transpose(2, 0, 1)
-cl = pan2['close']
-cl2 = cl[cl.iloc[:, -1] &gt; cl.iloc[:, -2]]
-pan11 = pan[cl2.index]
+<span class="n">pan2</span> <span class="o">=</span> <span class="n">pan</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">cl</span> <span class="o">=</span> <span class="n">pan2</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span>
+<span class="n">cl2</span> <span class="o">=</span> <span class="n">cl</span><span class="p">[</span><span class="n">cl</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">cl</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]]</span>
+<span class="n">pan11</span> <span class="o">=</span> <span class="n">pan</span><span class="p">[</span><span class="n">cl2</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
+</pre></div>
 
-</code></pre>
 
 <p>This looked clean. To test this, I had a toy data that I was experimenting with just small data of 20 or so rows (I often use such toy data when iterating over an approach, so that you don't end up spending a lot of time in loading the data itself.) Indeed, this approach is about <em>20-40 times faster</em>, based on some simple <code>time.time()</code> time delta computation. So the basic intuition is right, it's indeed very fast or Is it?.</p>
 <p>While, I have a reasonable working knowledge of <code>pandas</code>, I am far from an expert and have only some background in <code>numpy</code>. So I did not have an idea about how the particular pieces might be implemented (eg. <code>transpose</code> here.). Surely, basic test also suggests, it's worth a try. So now we take the code and run it against 'real data' - about 3000 (about 150 times original data) rows per <code>DataFrame</code> in a Panel, and the same code now runs about <em>3-4 times slower</em> than the first List Comprehension based approach. Oops! Seriously? First impression in such cases is something else must be wrong. So I started looking at explanations, while the former I was running on my desktop, dedicated CPU and the latter I was running on a VPS, could that be a problem? May be I should eliminate that variable first. So I tried the 'toy data' on the VPS, still the results are about the same. So clearly, something else is wrong.</p>
 <p>The next question was - how do I find out? My first (and quite wrong at that honestly) effort would be to use the <code>dtrace</code> support in Python and use some <code>perf</code> counters or tracing tools from the <a href="https://github.com/iovisor/bcc">bcc</a> to find out. Incidentally, that support is not there in Python 2.7 I am having on my Ubuntu machine. So what next? Let's run Python's native profilers and find out. Is the intuition even correct? So ran a simple profiling experiment by using the <code>cProfile</code> and <code>pstats</code>. The code looks like following - fairly straight forward.</p>
 <p>For the 'Vector' method -</p>
-<pre><code class="python">
-then0 = time.time()
-pr = cProfile.Profile()
-pr.enable()
+<div class="highlight"><pre><span></span><span class="n">then0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+<span class="n">pr</span> <span class="o">=</span> <span class="n">cProfile</span><span class="o">.</span><span class="n">Profile</span><span class="p">()</span>
+<span class="n">pr</span><span class="o">.</span><span class="n">enable</span><span class="p">()</span>
 
-pan2 = pan.transpose(2, 0, 1)
-cl = pan2['close']
-cl2 = cl[cl.iloc[:, -1] &gt; cl.iloc[:, -2]]
-pan11 = pan[cl2.index]
+<span class="n">pan2</span> <span class="o">=</span> <span class="n">pan</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+<span class="n">cl</span> <span class="o">=</span> <span class="n">pan2</span><span class="p">[</span><span class="s1">&#39;close&#39;</span><span class="p">]</span>
+<span class="n">cl2</span> <span class="o">=</span> <span class="n">cl</span><span class="p">[</span><span class="n">cl</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">cl</span><span class="o">.</span><span class="n">iloc</span><span class="p">[:,</span> <span class="o">-</span><span class="mi">2</span><span class="p">]]</span>
+<span class="n">pan11</span> <span class="o">=</span> <span class="n">pan</span><span class="p">[</span><span class="n">cl2</span><span class="o">.</span><span class="n">index</span><span class="p">]</span>
 
-pr.disable()
-pr.dump_stats('vector_stats.out')
-s = StringIO.StringIO()
+<span class="n">pr</span><span class="o">.</span><span class="n">disable</span><span class="p">()</span>
+<span class="n">pr</span><span class="o">.</span><span class="n">dump_stats</span><span class="p">(</span><span class="s1">&#39;vector_stats.out&#39;</span><span class="p">)</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">StringIO</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
 
-# Sort stats by cumulative and print only top 10%
-sort_by = 'cumulative'
-ps = pstats.Stats(pr, stream=s).sort_stats(sort_by)
-ps.print_stats(0.1)
-ps.print_callers()
-now0 = time.time()
+<span class="c1"># Sort stats by cumulative and print only top 10%</span>
+<span class="n">sort_by</span> <span class="o">=</span> <span class="s1">&#39;cumulative&#39;</span>
+<span class="n">ps</span> <span class="o">=</span> <span class="n">pstats</span><span class="o">.</span><span class="n">Stats</span><span class="p">(</span><span class="n">pr</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">sort_stats</span><span class="p">(</span><span class="n">sort_by</span><span class="p">)</span>
+<span class="n">ps</span><span class="o">.</span><span class="n">print_stats</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+<span class="n">ps</span><span class="o">.</span><span class="n">print_callers</span><span class="p">()</span>
+<span class="n">now0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+</pre></div>
 
-</code></pre>
 
 <p>and for the 'List Comprehension' method -</p>
-<pre><code class="python">then0 = time.time()
+<div class="highlight"><pre><span></span><span class="n">then0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
 
-pr = cProfile.Profile()
-pr.enable()
+<span class="n">pr</span> <span class="o">=</span> <span class="n">cProfile</span><span class="o">.</span><span class="n">Profile</span><span class="p">()</span>
+<span class="n">pr</span><span class="o">.</span><span class="n">enable</span><span class="p">()</span>
 
-sels = [pan[x]['close'][-1] &gt; pan[x]['close'][-2] for x in pan]
+<span class="n">sels</span> <span class="o">=</span> <span class="p">[</span><span class="n">pan</span><span class="p">[</span><span class="n">x</span><span class="p">][</span><span class="s1">&#39;close&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">&gt;</span> <span class="n">pan</span><span class="p">[</span><span class="n">x</span><span class="p">][</span><span class="s1">&#39;close&#39;</span><span class="p">][</span><span class="o">-</span><span class="mi">2</span><span class="p">]</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">pan</span><span class="p">]</span>
 
-pr.disable()
-pr.dump_stats('lc.stats')
-s = StringIO.StringIO()
+<span class="n">pr</span><span class="o">.</span><span class="n">disable</span><span class="p">()</span>
+<span class="n">pr</span><span class="o">.</span><span class="n">dump_stats</span><span class="p">(</span><span class="s1">&#39;lc.stats&#39;</span><span class="p">)</span>
+<span class="n">s</span> <span class="o">=</span> <span class="n">StringIO</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
 
-# Sort stats by cumulative and print only top 10%
-sort_by = 'cumulative'
-ps = pstats.Stats(pr, stream=s).sort_stats(sort_by)
-ps.print_stats(0.1)
+<span class="c1"># Sort stats by cumulative and print only top 10%</span>
+<span class="n">sort_by</span> <span class="o">=</span> <span class="s1">&#39;cumulative&#39;</span>
+<span class="n">ps</span> <span class="o">=</span> <span class="n">pstats</span><span class="o">.</span><span class="n">Stats</span><span class="p">(</span><span class="n">pr</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="n">s</span><span class="p">)</span><span class="o">.</span><span class="n">sort_stats</span><span class="p">(</span><span class="n">sort_by</span><span class="p">)</span>
+<span class="n">ps</span><span class="o">.</span><span class="n">print_stats</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
 
-now0 = time.time()
+<span class="n">now0</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time</span><span class="p">()</span>
+</pre></div>
 
-</code></pre>
 
 <p>Here are the actual Profiling outputs for run on 'small data'.</p>
 <p>For the List Comprehension method -</p>
-<pre><code class="bash">0.729673147202
-734
-         552007 function calls (533140 primitive calls) in 0.704 seconds
+<div class="highlight"><pre><span></span><span class="m">0</span>.729673147202
+<span class="m">734</span>
+         <span class="m">552007</span> <span class="k">function</span> calls <span class="o">(</span><span class="m">533140</span> primitive calls<span class="o">)</span> in <span class="m">0</span>.704 seconds
 
-   Ordered by: cumulative time
-   List reduced from 129 to 13 due to restriction &lt;0.1&gt;
+   Ordered by: cumulative <span class="nb">time</span>
+   List reduced from <span class="m">129</span> to <span class="m">13</span> due to restriction &lt;<span class="m">0</span>.1&gt;
 
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-     6288    0.017    0.000    0.472    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1640(_get_item_cache)
-     3144    0.014    0.000    0.361    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280(__getitem__)
-     3144    0.003    0.000    0.334    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1637(__getitem__)
-     1572    0.009    0.000    0.282    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:558(_box_item_values)
-     1572    0.012    0.000    0.250    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:261(__init__)
-     1572    0.014    0.000    0.229    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:413(_init_ndarray)
-     1572    0.009    0.000    0.181    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:4283(create_block_manager_from_blocks)
-     3144    0.008    0.000    0.176    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:598(__getitem__)
-     3144    0.012    0.000    0.166    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1940(__getitem__)
-     3144    0.014    0.000    0.166    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimes.py:1358(get_value)
-     1572    0.010    0.000    0.148    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:2779(__init__)
-     3144    0.003    0.000    0.144    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1966(_getitem_column)
-     3144    0.029    0.000    0.144    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/base.py:2454(get_value)
+   ncalls  tottime  percall  cumtime  percall filename:lineno<span class="o">(</span><span class="k">function</span><span class="o">)</span>
+     <span class="m">6288</span>    <span class="m">0</span>.017    <span class="m">0</span>.000    <span class="m">0</span>.472    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1640<span class="o">(</span>_get_item_cache<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.014    <span class="m">0</span>.000    <span class="m">0</span>.361    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.003    <span class="m">0</span>.000    <span class="m">0</span>.334    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1637<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">1572</span>    <span class="m">0</span>.009    <span class="m">0</span>.000    <span class="m">0</span>.282    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:558<span class="o">(</span>_box_item_values<span class="o">)</span>
+     <span class="m">1572</span>    <span class="m">0</span>.012    <span class="m">0</span>.000    <span class="m">0</span>.250    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:261<span class="o">(</span>__init__<span class="o">)</span>
+     <span class="m">1572</span>    <span class="m">0</span>.014    <span class="m">0</span>.000    <span class="m">0</span>.229    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:413<span class="o">(</span>_init_ndarray<span class="o">)</span>
+     <span class="m">1572</span>    <span class="m">0</span>.009    <span class="m">0</span>.000    <span class="m">0</span>.181    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:4283<span class="o">(</span>create_block_manager_from_blocks<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.008    <span class="m">0</span>.000    <span class="m">0</span>.176    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:598<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.012    <span class="m">0</span>.000    <span class="m">0</span>.166    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1940<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.014    <span class="m">0</span>.000    <span class="m">0</span>.166    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimes.py:1358<span class="o">(</span>get_value<span class="o">)</span>
+     <span class="m">1572</span>    <span class="m">0</span>.010    <span class="m">0</span>.000    <span class="m">0</span>.148    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:2779<span class="o">(</span>__init__<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.003    <span class="m">0</span>.000    <span class="m">0</span>.144    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1966<span class="o">(</span>_getitem_column<span class="o">)</span>
+     <span class="m">3144</span>    <span class="m">0</span>.029    <span class="m">0</span>.000    <span class="m">0</span>.144    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/base.py:2454<span class="o">(</span>get_value<span class="o">)</span>
+</pre></div>
 
-
-</code></pre>
 
 <p>For the Vector method -</p>
-<pre><code class="bash">0.0554749965668
-734
-         7443 function calls (7341 primitive calls) in 0.026 seconds
+<div class="highlight"><pre><span></span><span class="m">0</span>.0554749965668
+<span class="m">734</span>
+         <span class="m">7443</span> <span class="k">function</span> calls <span class="o">(</span><span class="m">7341</span> primitive calls<span class="o">)</span> in <span class="m">0</span>.026 seconds
 
-   Ordered by: cumulative time
-   List reduced from 447 to 45 due to restriction &lt;0.1&gt;
+   Ordered by: cumulative <span class="nb">time</span>
+   List reduced from <span class="m">447</span> to <span class="m">45</span> due to restriction &lt;<span class="m">0</span>.1&gt;
 
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-        1    0.000    0.000    0.012    0.012 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:1202(transpose)
-        1    0.001    0.001    0.012    0.012 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:496(transpose)
-        1    0.000    0.000    0.008    0.008 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1940(__getitem__)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimelike.py:249(__contains__)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimes.py:1401(get_loc)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/base.py:42(__str__)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/base.py:54(__bytes__)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:974(__unicode__)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:3256(values)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:462(as_matrix)
-        1    0.000    0.000    0.007    0.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3438(as_matrix)
-        1    0.002    0.002    0.006    0.006 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3452(_interleave)
-        1    0.000    0.000    0.006    0.006 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:993(to_string)
-        1    0.004    0.004    0.004    0.004 {method 'copy' of 'numpy.ndarray' objects}
-        2    0.000    0.000    0.004    0.002 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280(__getitem__)
-        1    0.000    0.000    0.004    0.004 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/io/formats/format.py:243(to_string)
-      7/5    0.000    0.000    0.003    0.001 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexing.py:1317(__getitem__)
-        2    0.000    0.000    0.003    0.001 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:160(get_values)
-        4    0.003    0.001    0.003    0.001 {method 'astype' of 'numpy.ndarray' objects}
+   ncalls  tottime  percall  cumtime  percall filename:lineno<span class="o">(</span><span class="k">function</span><span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.012    <span class="m">0</span>.012 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:1202<span class="o">(</span>transpose<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.001    <span class="m">0</span>.001    <span class="m">0</span>.012    <span class="m">0</span>.012 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:496<span class="o">(</span>transpose<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.008    <span class="m">0</span>.008 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1940<span class="o">(</span>__getitem__<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimelike.py:249<span class="o">(</span>__contains__<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimes.py:1401<span class="o">(</span>get_loc<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/base.py:42<span class="o">(</span>__str__<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/base.py:54<span class="o">(</span>__bytes__<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:974<span class="o">(</span>__unicode__<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:3256<span class="o">(</span>values<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:462<span class="o">(</span>as_matrix<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.007    <span class="m">0</span>.007 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3438<span class="o">(</span>as_matrix<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.002    <span class="m">0</span>.002    <span class="m">0</span>.006    <span class="m">0</span>.006 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3452<span class="o">(</span>_interleave<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.006    <span class="m">0</span>.006 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:993<span class="o">(</span>to_string<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.004    <span class="m">0</span>.004    <span class="m">0</span>.004    <span class="m">0</span>.004 <span class="o">{</span>method <span class="s1">&#39;copy&#39;</span> of <span class="s1">&#39;numpy.ndarray&#39;</span> objects<span class="o">}</span>
+        <span class="m">2</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.004    <span class="m">0</span>.002 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280<span class="o">(</span>__getitem__<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.004    <span class="m">0</span>.004 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/io/formats/format.py:243<span class="o">(</span>to_string<span class="o">)</span>
+      <span class="m">7</span>/5    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.003    <span class="m">0</span>.001 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexing.py:1317<span class="o">(</span>__getitem__<span class="o">)</span>
+        <span class="m">2</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">0</span>.003    <span class="m">0</span>.001 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:160<span class="o">(</span>get_values<span class="o">)</span>
+        <span class="m">4</span>    <span class="m">0</span>.003    <span class="m">0</span>.001    <span class="m">0</span>.003    <span class="m">0</span>.001 <span class="o">{</span>method <span class="s1">&#39;astype&#39;</span> of <span class="s1">&#39;numpy.ndarray&#39;</span> objects<span class="o">}</span>
 
 &lt;stripped-a-few-lines&gt;
-</code></pre>
+</pre></div>
+
 
 <p>So the data also - justifies the basic intuition, in the case of 'vector' method, there are about 7000 calls compared to about '500000' calls to functions, justifying that <em>may be</em> we are doing more work in the List Comprehensions method.</p>
 <p>So why is this so bad? Let's see what it looks like on the real data. Spoiler Alert: A good observer would have noticed that <code>'copy' method of 'numpy.ndarray' objects</code> already.</p>
 <p>Below is the profiling output on the actual data that is about 3000 rows in a DataFrame.</p>
 <p>For the List Comprehension method -</p>
-<pre><code class="bash">1.5659070015
-689
-         550855 function calls (532024 primitive calls) in 1.542 seconds
+<div class="highlight"><pre><span></span><span class="m">1</span>.5659070015
+<span class="m">689</span>
+         <span class="m">550855</span> <span class="k">function</span> calls <span class="o">(</span><span class="m">532024</span> primitive calls<span class="o">)</span> in <span class="m">1</span>.542 seconds
 
-   Ordered by: cumulative time
-   List reduced from 132 to 13 due to restriction &lt;0.1&gt;
+   Ordered by: cumulative <span class="nb">time</span>
+   List reduced from <span class="m">132</span> to <span class="m">13</span> due to restriction &lt;<span class="m">0</span>.1&gt;
 
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-     6276    0.038    0.000    1.008    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1640(_get_item_cache)
-     3138    0.032    0.000    0.806    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280(__getitem__)
-     3138    0.008    0.000    0.736    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1637(__getitem__)
-     1569    0.014    0.000    0.635    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:558(_box_item_values)
-     1569    0.022    0.000    0.564    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:261(__init__)
-     1569    0.025    0.000    0.527    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:413(_init_ndarray)
-     1569    0.020    0.000    0.402    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:4283(create_block_manager_from_blocks)
-     3138    0.017    0.000    0.397    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:598(__getitem__)
-     3138    0.027    0.000    0.368    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimes.py:1358(get_value)
-     3138    0.024    0.000    0.340    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1940(__getitem__)
-     3138    0.057    0.000    0.323    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/base.py:2454(get_value)
-     3138    0.008    0.000    0.288    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1966(_getitem_column)
-     1569    0.019    0.000    0.284    0.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:2779(__init__)
+   ncalls  tottime  percall  cumtime  percall filename:lineno<span class="o">(</span><span class="k">function</span><span class="o">)</span>
+     <span class="m">6276</span>    <span class="m">0</span>.038    <span class="m">0</span>.000    <span class="m">1</span>.008    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1640<span class="o">(</span>_get_item_cache<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.032    <span class="m">0</span>.000    <span class="m">0</span>.806    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.008    <span class="m">0</span>.000    <span class="m">0</span>.736    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:1637<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">1569</span>    <span class="m">0</span>.014    <span class="m">0</span>.000    <span class="m">0</span>.635    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:558<span class="o">(</span>_box_item_values<span class="o">)</span>
+     <span class="m">1569</span>    <span class="m">0</span>.022    <span class="m">0</span>.000    <span class="m">0</span>.564    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:261<span class="o">(</span>__init__<span class="o">)</span>
+     <span class="m">1569</span>    <span class="m">0</span>.025    <span class="m">0</span>.000    <span class="m">0</span>.527    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:413<span class="o">(</span>_init_ndarray<span class="o">)</span>
+     <span class="m">1569</span>    <span class="m">0</span>.020    <span class="m">0</span>.000    <span class="m">0</span>.402    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:4283<span class="o">(</span>create_block_manager_from_blocks<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.017    <span class="m">0</span>.000    <span class="m">0</span>.397    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/series.py:598<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.027    <span class="m">0</span>.000    <span class="m">0</span>.368    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/datetimes.py:1358<span class="o">(</span>get_value<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.024    <span class="m">0</span>.000    <span class="m">0</span>.340    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1940<span class="o">(</span>__getitem__<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.057    <span class="m">0</span>.000    <span class="m">0</span>.323    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/indexes/base.py:2454<span class="o">(</span>get_value<span class="o">)</span>
+     <span class="m">3138</span>    <span class="m">0</span>.008    <span class="m">0</span>.000    <span class="m">0</span>.288    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/frame.py:1966<span class="o">(</span>_getitem_column<span class="o">)</span>
+     <span class="m">1569</span>    <span class="m">0</span>.019    <span class="m">0</span>.000    <span class="m">0</span>.284    <span class="m">0</span>.000 /actual/path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:2779<span class="o">(</span>__init__<span class="o">)</span>
+</pre></div>
 
-
-
-</code></pre>
 
 <p>and for the Vector method -</p>
-<pre><code class="bash">
-7.15247297287
-689
-         7443 function calls (7341 primitive calls) in 7.138 seconds
+<div class="highlight"><pre><span></span><span class="m">7</span>.15247297287
+<span class="m">689</span>
+         <span class="m">7443</span> <span class="k">function</span> calls <span class="o">(</span><span class="m">7341</span> primitive calls<span class="o">)</span> in <span class="m">7</span>.138 seconds
 
-   Ordered by: cumulative time
-   List reduced from 447 to 45 due to restriction &lt;0.1&gt;
+   Ordered by: cumulative <span class="nb">time</span>
+   List reduced from <span class="m">447</span> to <span class="m">45</span> due to restriction &lt;<span class="m">0</span>.1&gt;
 
-   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
-        1    0.000    0.000    5.000    5.000 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:1202(transpose)
-        1    0.349    0.349    5.000    5.000 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:496(transpose)
-        1    0.000    0.000    2.863    2.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:3256(values)
-        1    0.000    0.000    2.863    2.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:462(as_matrix)
-        1    0.000    0.000    2.863    2.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3438(as_matrix)
-        1    0.644    0.644    2.863    2.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3452(_interleave)
-        2    0.000    0.000    2.040    1.020 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280(__getitem__)
-        2    0.000    0.000    1.818    0.909 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:160(get_values)
-        4    1.818    0.454    1.818    0.454 {method 'astype' of 'numpy.ndarray' objects}
-        1    1.787    1.787    1.787    1.787 {method 'copy' of 'numpy.ndarray' objects}
+   ncalls  tottime  percall  cumtime  percall filename:lineno<span class="o">(</span><span class="k">function</span><span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">5</span>.000    <span class="m">5</span>.000 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:1202<span class="o">(</span>transpose<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.349    <span class="m">0</span>.349    <span class="m">5</span>.000    <span class="m">5</span>.000 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:496<span class="o">(</span>transpose<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">2</span>.863    <span class="m">2</span>.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/generic.py:3256<span class="o">(</span>values<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">2</span>.863    <span class="m">2</span>.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:462<span class="o">(</span>as_matrix<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">2</span>.863    <span class="m">2</span>.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3438<span class="o">(</span>as_matrix<span class="o">)</span>
+        <span class="m">1</span>    <span class="m">0</span>.644    <span class="m">0</span>.644    <span class="m">2</span>.863    <span class="m">2</span>.863 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:3452<span class="o">(</span>_interleave<span class="o">)</span>
+        <span class="m">2</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">2</span>.040    <span class="m">1</span>.020 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/panel.py:280<span class="o">(</span>__getitem__<span class="o">)</span>
+        <span class="m">2</span>    <span class="m">0</span>.000    <span class="m">0</span>.000    <span class="m">1</span>.818    <span class="m">0</span>.909 /path/to/data/equities-data-utils/venv/local/lib/python2.7/site-packages/pandas/core/internals.py:160<span class="o">(</span>get_values<span class="o">)</span>
+        <span class="m">4</span>    <span class="m">1</span>.818    <span class="m">0</span>.454    <span class="m">1</span>.818    <span class="m">0</span>.454 <span class="o">{</span>method <span class="s1">&#39;astype&#39;</span> of <span class="s1">&#39;numpy.ndarray&#39;</span> objects<span class="o">}</span>
+        <span class="m">1</span>    <span class="m">1</span>.787    <span class="m">1</span>.787    <span class="m">1</span>.787    <span class="m">1</span>.787 <span class="o">{</span>method <span class="s1">&#39;copy&#39;</span> of <span class="s1">&#39;numpy.ndarray&#39;</span> objects<span class="o">}</span>
+</pre></div>
 
-</code></pre>
 
 <p>Eureka! The <code>transpose</code> function has become extremely expensive for this big data. Note, the number of function calls is still about the same, about 7000 vs. 500000, but at-least some of the functions have become expensive and interestingly the total cost was actually growing sub-linearly for the List Comprehension method.</p>
 <p>Now, when one looks at this data, it's clearly not that counter intuitive. We are doing a <code>memcpy</code> of a huge array in the <code>transpose</code> method and that's likely is a cause of real slowdown. While in the former case, there was still <code>memcpy</code>, but on a data that could probably fit easily in cache (or at-least was quite cache friendly) compared to this. A lesson from 'networking data-path 101' don't do <code>memcpy</code> in the fast path.</p>
