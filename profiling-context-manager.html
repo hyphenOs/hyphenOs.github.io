@@ -1,0 +1,214 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <link href='//fonts.googleapis.com/css?family=Source+Sans+Pro:300,400,700,400italic' rel='stylesheet' type='text/css'>
+
+    <link rel="stylesheet" type="text/css" href="/theme/stylesheet/style.min.css">
+
+  <link rel="stylesheet" type="text/css" href="/theme/pygments/monokai.min.css">
+  <link rel="stylesheet" type="text/css" href="/theme/font-awesome/css/font-awesome.min.css">
+
+
+
+
+
+  <meta charset="utf-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <meta name="HandheldFriendly" content="True" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="" />
+
+
+<meta name="author" content="Abhijit Gadgil" />
+<meta name="description" content="We needed an ability to perform profiling in one of the classes we were implementing. The class was implementing a functionality that involved heavy computations, so it was a good idea to run profiling and find out where extra time is spent." />
+<meta name="keywords" content="profiling, with-statement, context manager, python">
+<meta property="og:site_name" content="hyphenOs {-Os} Blog"/>
+<meta property="og:title" content="Using Context Manager for Profiling"/>
+<meta property="og:description" content="We needed an ability to perform profiling in one of the classes we were implementing. The class was implementing a functionality that involved heavy computations, so it was a good idea to run profiling and find out where extra time is spent."/>
+<meta property="og:locale" content="en_US"/>
+<meta property="og:url" content="/profiling-context-manager.html"/>
+<meta property="og:type" content="article"/>
+<meta property="article:published_time" content="2017-08-24 00:00:00+05:30"/>
+<meta property="article:modified_time" content=""/>
+<meta property="article:author" content="/author/abhijit-gadgil.html">
+<meta property="article:section" content="Python Profiling"/>
+<meta property="article:tag" content="profiling"/>
+<meta property="article:tag" content="with-statement"/>
+<meta property="article:tag" content="context manager"/>
+<meta property="article:tag" content="python"/>
+<meta property="og:image" content="/images/hyphenos-white.svg">
+
+  <title>hyphenOs {-Os} Blog &ndash; Using Context Manager for Profiling</title>
+
+</head>
+<body>
+  <aside>
+    <div>
+      <a href="">
+        <img src="/images/hyphenos-white.svg" alt="" title="">
+      </a>
+      <h1><a href=""></a></h1>
+
+
+      <nav>
+        <ul class="list">
+
+          <li><a href="https://hyphenos.io/" target="_blank">hyphenOs Home</a></li>
+        </ul>
+      </nav>
+
+      <ul class="social">
+        <li><a class="sc-github" href="https://github.com/hyphenOs" target="_blank"><i class="fa fa-github"></i></a></li>
+      </ul>
+    </div>
+
+
+  </aside>
+  <main>
+
+
+<article class="single">
+  <header>
+    <h1 id="profiling-context-manager">Using Context Manager for Profiling</h1>
+    <p>
+          Posted on Thu 24 August 2017 in <a href="/category/python-profiling.html">Python Profiling</a>
+
+
+    </p>
+  </header>
+
+
+  <div>
+    <p>Recently, was implementing a class, where, we wanted to be able to 'plug-in' profiling in some functions. Summarizing some of the requirements -</p>
+<ol>
+<li>
+<p>Ability to add profiling information in several places in code. (Something like <code>cProfile.Profile().enable()</code> and <code>cProfile.Profile.disable()</code> done frequently.</p>
+</li>
+<li>
+<p>Ability to enable profiling globally or not, so when globally disabled, it should add a minimum overhead.</p>
+</li>
+<li>
+<p>Being able to related profiling information with the code.</p>
+</li>
+</ol>
+<p>My initial idea was to have a class wide <code>cProfile.Profile()</code> object and keep enabling and disabling it for the parts of the code I wanted to profile. There are a few problems with this - viz.</p>
+<ol>
+<li>
+<p>The code gets littered with <code>enable</code>/<code>disable</code> code.</p>
+</li>
+<li>
+<p>Also, to meet requirement 2. above, this would have been wrapped in an <code>if</code> statement</p>
+</li>
+<li>
+<p>Dumping stats only for some part of the code - in a section would become a little irritating to handle (see below).</p>
+</li>
+</ol>
+<p>For this type of problems, Context Managers in Python look like a good choice. All the <code>enable</code>/<code>disable</code> logic, <code>if</code> conditions etc. can be neatly wrapped inside the <code>__enter__</code> and <code>__exit__</code> methods.</p>
+<p>The code for the <code>class Profiler</code> looks like following</p>
+<div class="highlight"><pre><span></span><span class="k">class</span> <span class="nc">Profiler</span><span class="p">(</span><span class="nb">object</span><span class="p">):</span>
+
+    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parent</span><span class="o">=</span><span class="bp">None</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">False</span><span class="p">,</span> <span class="n">contextstr</span><span class="o">=</span><span class="bp">None</span><span class="p">):</span>
+                <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">                parent: the callee</span>
+<span class="sd">                enabled: Should profile or not</span>
+<span class="sd">                contextstr: used as a marker to separate dump data.</span>
+<span class="sd">                &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">parent</span> <span class="o">=</span> <span class="n">parent</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">enabled</span> <span class="o">=</span> <span class="bp">True</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">stream</span> <span class="o">=</span> <span class="n">StringIO</span><span class="o">.</span><span class="n">StringIO</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">contextstr</span> <span class="o">=</span> <span class="n">contextstr</span> <span class="ow">or</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span> <span class="o">=</span> <span class="n">cProfile</span><span class="o">.</span><span class="n">Profile</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="c1"># Start profiling.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;profile: {}: enter</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">contextstr</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">enable</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">exc_type</span><span class="p">,</span> <span class="n">exc_val</span><span class="p">,</span> <span class="n">exc_tb</span><span class="p">):</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">enabled</span><span class="p">:</span>
+            <span class="k">return</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="o">.</span><span class="n">disable</span><span class="p">()</span>
+
+        <span class="n">sort_by</span> <span class="o">=</span> <span class="s1">&#39;cumulative&#39;</span>
+        <span class="n">ps</span> <span class="o">=</span> <span class="n">pstats</span><span class="o">.</span><span class="n">Stats</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">profiler</span><span class="p">,</span> <span class="n">stream</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">stream</span><span class="p">)</span><span class="o">.</span><span class="n">sort_stats</span><span class="p">(</span><span class="n">sort_by</span><span class="p">)</span>
+        <span class="n">ps</span><span class="o">.</span><span class="n">print_stats</span><span class="p">(</span><span class="mf">0.1</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">stream</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="s2">&quot;profile: {}: exit</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">format</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">contextstr</span><span class="p">))</span>
+        <span class="k">print</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">stream</span><span class="o">.</span><span class="n">getvalue</span><span class="p">())</span>
+
+                <span class="c1"># Raise any exception if raised during execution of code.</span>
+              <span class="k">return</span> <span class="bp">False</span>
+</pre></div>
+
+
+<p>And then this code can be called as follows -</p>
+<div class="highlight"><pre><span></span>        <span class="k">with</span> <span class="n">Profiler</span><span class="p">(</span><span class="n">contextstr</span><span class="o">=</span><span class="s2">&quot;---foo profiling ----&quot;</span><span class="p">,</span> <span class="n">enabled</span><span class="o">=</span><span class="bp">True</span><span class="p">):</span>
+                <span class="c1"># code to be profiled</span>
+</pre></div>
+
+
+<p>Pretty simple and extremely readable. Also, this just works fine as a nested Context Manager, cool right?</p>
+<p>Some Notes:</p>
+<ol>
+<li>Just noticed a quirk of <code>pstats.Stats</code> Constructor. If we pass a <code>Profile</code> object to the <code>pstats.Stats</code> Constructor as above, unless the <code>Profile</code> object is <code>enable</code>d, the Constructor raises an Exception that looks like -</li>
+</ol>
+<div class="highlight"><pre><span></span>  File <span class="s2">&quot;/usr/lib/python2.7/pstats.py&quot;</span>, line <span class="m">81</span>, in __init__
+    self.init<span class="o">(</span>arg<span class="o">)</span>
+  File <span class="s2">&quot;/usr/lib/python2.7/pstats.py&quot;</span>, line <span class="m">95</span>, in init
+    self.load_stats<span class="o">(</span>arg<span class="o">)</span>
+  File <span class="s2">&quot;/usr/lib/python2.7/pstats.py&quot;</span>, line <span class="m">124</span>, in load_stats
+    % <span class="o">(</span>self.__class__, arg<span class="o">))</span>
+TypeError: Cannot create or construct a &lt;class pstats.Stats at 0x7f683bec19a8&gt; object from &lt;cProfile.Profile object at 0x7f683bf1a6e0&gt;
+</pre></div>
+
+
+<ol>
+<li>Also, returning <code>False</code> would make sure, if the running code within a <code>with</code> block raised an exception, that gets re-raised (so we do not mess up with the Application flow by consuming exceptions.)</li>
+</ol>
+  </div>
+  <div class="tag-cloud">
+    <p>
+      <a href="/tag/profiling.html">profiling</a>
+      <a href="/tag/with-statement.html">with-statement</a>
+      <a href="/tag/context-manager.html">context manager</a>
+      <a href="/tag/python.html">python</a>
+    </p>
+  </div>
+
+
+
+
+</article>
+
+    <footer>
+<p>&copy; hyphenOs Software Labs. Pvt. Ltd. </p>
+<p>    Powered by <a href="http://getpelican.com" target="_blank">Pelican</a> - <a href="https://github.com/alexandrevicenzi/flex" target="_blank">Flex</a> theme by <a href="http://alexandrevicenzi.com" target="_blank">Alexandre Vicenzi</a>
+</p>    </footer>
+  </main>
+
+
+
+
+
+<script type="application/ld+json">
+{
+  "@context" : "http://schema.org",
+  "@type" : "Blog",
+  "name": " hyphenOs {-Os} Blog ",
+  "url" : "",
+  "image": "/images/hyphenos-white.svg",
+  "description": ""
+}
+</script>
+</body>
+</html>
